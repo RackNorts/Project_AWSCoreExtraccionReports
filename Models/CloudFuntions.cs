@@ -45,15 +45,30 @@ namespace AWSCoreExtraccionReports.Models
         //Funcion para listar las politicas por Usuario
         public async Task<List<AttachedPolicyType>> ListPolicyUser(AmazonIdentityManagementServiceClient iamClient,string userName)
         {
+
             List<AttachedPolicyType> policyTypes = new();
             string? maker = null;
 
-            do
+            try
             {
-                var response = await iamClient.ListAttachedUserPoliciesAsync(new ListAttachedUserPoliciesRequest { UserName = userName, Marker = maker });
-                policyTypes.AddRange(response.AttachedPolicies);
-                maker = response.Marker;
-            } while (maker != null);
+                do
+                {
+                    var request = new ListAttachedUserPoliciesRequest { UserName = userName, Marker = maker };
+                    var response = await iamClient.ListAttachedUserPoliciesAsync(request);
+
+                    if(response.AttachedPolicies != null)
+                    {
+                        policyTypes.AddRange(response.AttachedPolicies);
+                    }
+
+                    maker = response.Marker;
+                } while (!string.IsNullOrEmpty(maker));
+
+			}
+            catch (NoSuchEntityException)
+            {
+                Console.WriteLine($"Usuario '{userName}' no existe.");
+            }
 
             return policyTypes;
         }
@@ -111,24 +126,25 @@ namespace AWSCoreExtraccionReports.Models
             List<EnabledServicePrincipal> enabledServices = new();
             string? nextToken = null;
 
-            do
+            try
             {
-                var request = new ListAWSServiceAccessForOrganizationRequest
-                {
-                    NextToken = nextToken
-                };
+				do
+				{
+					var request = new ListAWSServiceAccessForOrganizationRequest { NextToken = nextToken };
+					var response = await orgClient.ListAWSServiceAccessForOrganizationAsync(request);
 
-                var response = await orgClient.ListAWSServiceAccessForOrganizationAsync(request);
-
-                foreach (var service in response.EnabledServicePrincipals)
-                {
-                    enabledServices.Add(service);
-                }
-
-                nextToken = response.NextToken;
-
-            } while (!string.IsNullOrEmpty(nextToken));
-
+					if (response.EnabledServicePrincipals != null)
+					{
+						enabledServices.AddRange(response.EnabledServicePrincipals);
+					}
+					nextToken = response.NextToken;
+				} while (!string.IsNullOrEmpty(nextToken));
+			}
+            catch (AmazonOrganizationsException ex)
+            {
+                Console.WriteLine($"Error Al obtener servicios de la organizacion: {ex.Message}");
+                throw;
+            }
             return enabledServices;
         }
 

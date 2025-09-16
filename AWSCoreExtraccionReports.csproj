@@ -8,16 +8,18 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="AWSSDK.APIGateway" Version="3.7.401.63" />
-    <PackageReference Include="AWSSDK.CloudTrail" Version="3.7.403.35" />
-    <PackageReference Include="AWSSDK.CloudTrailData" Version="3.7.400.119" />
-    <PackageReference Include="AWSSDK.Core" Version="3.7.402.28" />
-    <PackageReference Include="AWSSDK.EC2" Version="3.7.415.2" />
-    <PackageReference Include="AWSSDK.IdentityManagement" Version="3.7.404.31" />
-    <PackageReference Include="AWSSDK.IdentityStore" Version="3.7.400.119" />
-    <PackageReference Include="AWSSDK.Organizations" Version="3.7.405.48" />
-    <PackageReference Include="AWSSDK.ResourceGroupsTaggingAPI" Version="3.7.400.119" />
-    <PackageReference Include="AWSSDK.S3" Version="3.7.415.27" />
+    <PackageReference Include="AWSSDK.APIGateway" Version="4.0.2.1" />
+    <PackageReference Include="AWSSDK.CloudTrail" Version="4.0.2.1" />
+    <PackageReference Include="AWSSDK.CloudTrailData" Version="4.0.0.21" />
+    <PackageReference Include="AWSSDK.Core" Version="4.0.0.26" />
+    <PackageReference Include="AWSSDK.EC2" Version="4.0.37" />
+    <PackageReference Include="AWSSDK.IdentityManagement" Version="4.0.3.2" />
+    <PackageReference Include="AWSSDK.IdentityStore" Version="4.0.1.1" />
+    <PackageReference Include="AWSSDK.Organizations" Version="4.0.4" />
+    <PackageReference Include="AWSSDK.ResourceGroupsTaggingAPI" Version="4.0.0.21" />
+    <PackageReference Include="AWSSDK.S3" Version="4.0.7" />
+    <PackageReference Include="AWSSDK.SSO" Version="4.0.1.1" />
+    <PackageReference Include="AWSSDK.SSOOIDC" Version="4.0.1.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 

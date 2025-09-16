@@ -6,6 +6,7 @@ using Amazon.IdentityManagement.Model;
 using Amazon.Organizations;
 using Amazon.Organizations.Model;
 using Amazon.Runtime;
+using Amazon.Runtime.CredentialManagement;
 using Amazon.S3;
 using Amazon.S3.Model;
 
@@ -20,14 +21,19 @@ namespace AWSCoreExtraccionReports.Models
 
 
         //Funcino de ejecutar el reporte de usuarios y permisos asignados.
-        [Obsolete]
         public async Task<List<AccountUsers>> ReportUserConsole(string AWSConnection)
         {
             reportsLine = ["UserName|ARN|DateCreate|Permissions"];
             ReportName = $"Cofiguracion_Usuarios_{DateTime.Now:ddMMyyyy}.txt";
             
             List<AccountUsers> Report = [];
-            StoredProfileAWSCredentials Credentials = new(AWSConnection);
+
+            SharedCredentialsFile sharedFile = new SharedCredentialsFile();
+            if (!sharedFile.TryGetProfile(AWSConnection, out var profile))
+            {
+                throw new Exception($"Perfil ''{AWSConnection}'' no encontroado.....");
+            }
+            var  Credentials = AWSCredentialsFactory.GetAWSCredentials(profile, sharedFile);
             using (AmazonIdentityManagementServiceClient iamClient = new(Credentials, RegionEndpoint.USEast1))
             {
                 List<User> user = await CloudFuntions.ListAllUsers(iamClient);
@@ -35,37 +41,47 @@ namespace AWSCoreExtraccionReports.Models
                 foreach (var item in user)
                 {
                     List<AttachedPolicyType> policyTypes = await CloudFuntions.ListPolicyUser(iamClient, item.UserName);
+                    if (policyTypes.Count == 0)
+                    {
+                        reportsLine.Add(string.Format("{0}|{1}|{2}|NO_POLICIES",item.UserName,item.Arn,item.CreateDate.Value.ToString("MM/dd/yyyy HH:mm")));
+                    }
+
                     foreach(var policy in policyTypes)
                     {
                         model = new()
                         {
                             UserName = item.UserName.ToLower(),
                             ARN = item.Arn.ToLower(),
-                            UserCreate = item.CreateDate.ToString("MM/dd/yyyy HH:mm"),
+							UserCreate = item.CreateDate.Value.ToString("MM/dd/yyyy HH:mm"),
                             Permissions = policy.PolicyName.ToString()
                         };
 
 
-                        reportsLine.Add(string.Format("{0}|{1}|{2}|{3}",item.UserName.ToLower(),item.Arn,item.CreateDate.ToString("MM/dd/yyyy HH:mm"),policy.PolicyName));
+                        reportsLine.Add(string.Format("{0}|{1}|{2}|{3}",model.UserName,model.ARN,model.UserCreate,model.Permissions));
                         Report.AddRange(model);
                     }
                 }
             }
             
             File.WriteAllLines(Path.Combine(Environment.CurrentDirectory, ReportName), reportsLine);
-            await LoadS3Reports(AWSConnection, "reportsecurity", Path.Combine(Environment.CurrentDirectory, ReportName));
+            //await LoadS3Reports(AWSConnection, "reportsecurity", Path.Combine(Environment.CurrentDirectory, ReportName));
             return Report;
         }
 
         //Funcion de ejecutar el reporte de cuentas vs PermissionSet
-        [Obsolete]
         public async Task<List<AccountPermissionSetAndPolicy>> ReportAccountVSPermissionSetPolicy(string AWSConnection)
         {
             reportsLine = ["Account|NamePolicy|JSONConfigurationPolicy"];
             ReportName = $"Cofiguracion_Cuenta_PermissionSet_{DateTime.Now:ddMMyyyy}.txt";
 
             List<AccountPermissionSetAndPolicy> Report = [];
-            StoredProfileAWSCredentials Credentials = new(AWSConnection);
+			SharedCredentialsFile sharedFile = new SharedCredentialsFile();
+			if (!sharedFile.TryGetProfile(AWSConnection, out var profile))
+			{
+				throw new Exception($"Perfil ''{AWSConnection}'' no encontroado.....");
+			}
+			var Credentials = AWSCredentialsFactory.GetAWSCredentials(profile, sharedFile);
+			//StoredProfileAWSCredentials Credentials = new(AWSConnection);
             AmazonIdentityManagementServiceClient iamClient = new(Credentials, RegionEndpoint.USEast1);
             using (AmazonOrganizationsClient OrgClient = new(Credentials, RegionEndpoint.USEast1))
             {
@@ -89,52 +105,75 @@ namespace AWSCoreExtraccionReports.Models
             }
 
             File.WriteAllLines(Path.Combine(Environment.CurrentDirectory, ReportName), reportsLine);
-            await LoadS3Reports(AWSConnection, "reportsecurity", Path.Combine(Environment.CurrentDirectory, ReportName));
+            //await LoadS3Reports(AWSConnection, "reportsecurity", Path.Combine(Environment.CurrentDirectory, ReportName));
             return Report;
         }
 
         //Funcion de ejecutar el reporte de cuentas vs Servicios Activos
-        [Obsolete]
         public async Task<List<AccountService>> ReportAccountVSAvailableService(string AWSConnection)
         {
             reportsLine = ["Account|NameAccount|Service|State"];
             ReportName = $"Cofiguracion_Cuenta_Servicios_Activos_{DateTime.Now:ddMMyyyy}.txt";
 
             List<AccountService> report = [];
-            StoredProfileAWSCredentials Credentials = new(AWSConnection);
-            using (AmazonOrganizationsClient orgClient = new(Credentials, RegionEndpoint.USEast1))
+			SharedCredentialsFile sharedFile = new SharedCredentialsFile();
+			if (!sharedFile.TryGetProfile(AWSConnection, out var profile))
+			{
+				throw new Exception($"Perfil ''{AWSConnection}'' no encontroado.....");
+			}
+			var Credentials = AWSCredentialsFactory.GetAWSCredentials(profile, sharedFile);
+			using (AmazonOrganizationsClient orgClient = new(Credentials, RegionEndpoint.USEast1))
             {
                 List<Account> accounts = await CloudFuntions.ListAllAccounts(orgClient);
-                AccountService model = new();
+                AccountService? model = null;
+                int delayBetweenCallsMs = 500;
 
                 foreach (Account account in accounts)
                 {
-                    model = new();
-                    List<EnabledServicePrincipal> services = await CloudFuntions.ListEnabledServicesForAccount(orgClient, account.Id);
-
-                    foreach (EnabledServicePrincipal service in services)
+                    try
                     {
-                        model.Account = account.Id;
-                        model.NameAccount = account.Name.ToLower();
-                        model.Service = service.ServicePrincipal;
-                        model.State = account.Status;
-                        reportsLine.Add(string.Format("{0}|{1}|{2}|{3}",model.Account,model.NameAccount,model.Service,model.State));
-                        report.Add(model);
+                        List<EnabledServicePrincipal> services = await CloudFuntions.ListEnabledServicesForAccount(orgClient, account.Id);
+                        foreach (EnabledServicePrincipal service in services)
+                        {
+                            model = new()
+                            {
+							    Account = account.Id,
+                                NameAccount = account.Name.ToLower(),
+                                Service = service.ServicePrincipal,
+                                State = account.Status
+                            };
+
+						    reportsLine.Add(string.Format("{0}|{1}|{2}|{3}",model.Account,model.NameAccount,model.Service,model.State));
+                            report.AddRange(model);
+                        }
+                    } catch (AmazonOrganizationsException ex) when (ex.ErrorCode == "TooManyRequestsException")
+                    {
+                        Console.WriteLine($"throttling para cuenta {account.Id} Aumentando delay....");
+                        delayBetweenCallsMs += 100;
+                        await Task.Delay(1000);
+                        continue;
                     }
+
+                    await Task.Delay(delayBetweenCallsMs);
                 }
             }
 
             File.WriteAllLines(Path.Combine(Environment.CurrentDirectory, ReportName), reportsLine);
-            await LoadS3Reports(AWSConnection, "reportsecurity", Path.Combine(Environment.CurrentDirectory, ReportName));
             return report;
         }
 
         //Funcion de ejecutar la carga de archivo a un bucket de S3
-        [Obsolete]
         public static async Task LoadS3Reports(string AWSConnection, string bucketName, string filereport)
         {
-            StoredProfileAWSCredentials Credentials = new (AWSConnection);
-            AmazonS3Client s3Client = new(Credentials, RegionEndpoint.USEast1);
+			SharedCredentialsFile sharedFile = new SharedCredentialsFile();
+			if (!sharedFile.TryGetProfile(AWSConnection, out var profile))
+			{
+				throw new Exception($"Perfil ''{AWSConnection}'' no encontroado.....");
+			}
+			var Credentials = AWSCredentialsFactory.GetAWSCredentials(profile, sharedFile);
+
+			//StoredProfileAWSCredentials Credentials = new (AWSConnection);
+			AmazonS3Client s3Client = new(Credentials, RegionEndpoint.USEast1);
             try
             {
 
@@ -168,11 +207,16 @@ namespace AWSCoreExtraccionReports.Models
 
 
         //Listado  Recursos EC2
-        [Obsolete]
         public static async Task<List<string>> ResoruceToEC2(string AWSConnection)
         {
-            StoredProfileAWSCredentials Credentials = new(AWSConnection);
-            using AmazonEC2Client EC2Client = new(Credentials, RegionEndpoint.USEast1);
+			SharedCredentialsFile sharedFile = new SharedCredentialsFile();
+			if (!sharedFile.TryGetProfile(AWSConnection, out var profile))
+			{
+				throw new Exception($"Perfil ''{AWSConnection}'' no encontroado.....");
+			}
+			var Credentials = AWSCredentialsFactory.GetAWSCredentials(profile, sharedFile);
+			//StoredProfileAWSCredentials Credentials = new(AWSConnection);
+			using AmazonEC2Client EC2Client = new(Credentials, RegionEndpoint.USEast1);
 
             List<string> Report = [];
             AccountResources model = new();
