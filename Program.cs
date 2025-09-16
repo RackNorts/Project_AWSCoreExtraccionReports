@@ -3,9 +3,8 @@
 // Cargar credenciales desde perfil AWS
 using(CloudReports cloud = new())
 {
-    string ACCT = "531977326990_BI-CYBERACCESSAUDIT-MASTER";
-
-
+    string ACCT = "";
+    
     //Console.WriteLine("Ejecucion de Cofiguracion_Cuenta_PermissionSet...");
     //List<AccountPermissionSetAndPolicy> accounts = await cloud.ReportAccountVSPermissionSetPolicy(ACCT);
     //Console.WriteLine($"Total de Registros: {accounts.Count}\nEjecucion de Cofiguracion_Cuenta_PermissionSet Finalizada...");
